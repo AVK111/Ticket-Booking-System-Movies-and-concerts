@@ -1,7 +1,12 @@
 import React from "react";
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Ticket, Film, Music2, Clapperboard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import Input from '../components/ui/Input';
+import Button from '../components/ui/Button';
+import { notify } from '../lib/toast';
 
 const Register = () => {
     const { register } = useAuth();
@@ -16,74 +21,120 @@ const Register = () => {
         setLoading(true);
         try {
             await register(form);
+            notify.success('Account created');
             navigate('/');
         } catch (err) {
-            setError(err.response?.data?.message || 'Registration failed');
+            const msg = err.response?.data?.message || 'Registration failed';
+            setError(msg);
+            notify.error(msg);
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="container" style={{ maxWidth: 420, paddingTop: 64 }}>
-            <h1 style={{ fontSize: '1.8rem', marginBottom: 24 }}>Create your account</h1>
+        <div className="min-h-[calc(100vh-64px)] grid lg:grid-cols-2">
+            <div className="hidden lg:flex relative overflow-hidden bg-bg-secondary items-center justify-center p-12">
+                <div className="absolute inset-0 bg-gradient-to-br from-accent-2/20 via-transparent to-accent/20" />
+                <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-accent-2/20 blur-3xl" />
+                <div className="absolute -bottom-24 -left-24 w-96 h-96 rounded-full bg-accent/20 blur-3xl" />
 
-            <form onSubmit={handleSubmit} className="card">
-                <div className="field">
-                    <label className="label">Name</label>
-                    <input
-                        className="input"
-                        required
-                        value={form.name}
-                        onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    />
-                </div>
+                <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                    className="relative z-10 max-w-sm"
+                >
+                    <div className="flex items-center gap-2 mb-8">
+                        <div className="w-10 h-10 rounded-xl bg-accent-2/20 flex items-center justify-center">
+                            <Ticket size={20} className="text-accent-2" />
+                        </div>
+                        <span className="font-display font-bold text-2xl">Marquee</span>
+                    </div>
+                    <h2 className="font-display text-3xl font-bold mb-3 leading-tight">
+                        Join the show.
+                    </h2>
+                    <p className="text-text-dim text-sm mb-10">
+                        Book instantly as a customer, or list your own events as an organiser.
+                    </p>
+                    <div className="flex gap-6 text-text-faint">
+                        <Film size={22} />
+                        <Music2 size={22} />
+                        <Clapperboard size={22} />
+                    </div>
+                </motion.div>
+            </div>
 
-                <div className="field">
-                    <label className="label">Email</label>
-                    <input
-                        className="input"
-                        type="email"
-                        required
-                        value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    />
-                </div>
+            <div className="flex items-center justify-center px-6 py-16">
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.35 }}
+                    className="w-full max-w-sm"
+                >
+                    <h1 className="font-display text-2xl font-bold text-text mb-1">Create your account</h1>
+                    <p className="text-text-dim text-sm mb-8">Start booking in under a minute.</p>
 
-                <div className="field">
-                    <label className="label">Password</label>
-                    <input
-                        className="input"
-                        type="password"
-                        required
-                        minLength={6}
-                        value={form.password}
-                        onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    />
-                </div>
+                    <form onSubmit={handleSubmit} className="bg-surface border border-border rounded-2xl p-6">
+                        <Input
+                            label="Name"
+                            required
+                            value={form.name}
+                            onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        />
+                        <Input
+                            label="Email"
+                            type="email"
+                            required
+                            value={form.email}
+                            onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        />
+                        <Input
+                            label="Password"
+                            type="password"
+                            required
+                            minLength={6}
+                            value={form.password}
+                            onChange={(e) => setForm({ ...form, password: e.target.value })}
+                        />
 
-                <div className="field">
-                    <label className="label">I want to</label>
-                    <select
-                        className="input"
-                        value={form.role}
-                        onChange={(e) => setForm({ ...form, role: e.target.value })}
-                    >
-                        <option value="customer">Book tickets (Customer)</option>
-                        <option value="organiser">Host events (Organiser)</option>
-                    </select>
-                </div>
+                        <div className="mb-4">
+                            <label className="block text-xs font-medium text-text-dim mb-1.5">I want to</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {[
+                                    { value: 'customer', label: 'Book tickets' },
+                                    { value: 'organiser', label: 'Host events' },
+                                ].map((opt) => (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => setForm({ ...form, role: opt.value })}
+                                        className={`text-sm font-medium py-2.5 rounded-xl border transition-colors ${form.role === opt.value
+                                                ? 'bg-accent/15 border-accent/40 text-accent'
+                                                : 'border-border text-text-dim hover:text-text hover:border-white/20'
+                                            }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
 
-                {error && <p className="error-text">{error}</p>}
+                        {error && <p className="text-xs text-error mb-3 -mt-1">{error}</p>}
 
-                <button className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
-                    {loading ? 'Creating account…' : 'Sign up'}
-                </button>
-            </form>
+                        <Button type="submit" loading={loading} className="w-full mt-1">
+                            {loading ? 'Creating account…' : 'Sign up'}
+                        </Button>
+                    </form>
 
-            <p style={{ color: 'var(--text-dim)', marginTop: 16, fontSize: '0.9rem' }}>
-                Already have an account? <Link to="/login">Log in</Link>
-            </p>
+                    <p className="text-text-dim text-sm mt-5 text-center">
+                        Already have an account?{' '}
+                        <Link to="/login" className="text-accent font-medium hover:underline">
+                            Log in
+                        </Link>
+                    </p>
+                </motion.div>
+            </div>
         </div>
     );
 };
