@@ -1,5 +1,13 @@
 # 🎟️ Marquee — Ticket Booking System
 
+### 🚀 Live Demo
+
+**Frontend:** https://ticket-booking-system-movies-and-concerts.onrender.com
+
+**Backend API:** https://marqueee.onrender.com
+
+**API Test:** https://marqueee.onrender.com/api/shows
+
 A full-stack ticket booking platform for movies and concerts. Customers browse events, book seats from a live visual seat map, get auto-released holds on checkout abandonment, join waitlists on sold-out shows, and receive QR-coded email tickets on confirmation.
 
 **Stack:** MongoDB · Express.js · React (Vite) · Node.js · Socket.io
@@ -182,9 +190,38 @@ wait
 One should return `200` with the seat held; the other should return `409 Some seats were already taken`.
 
 ---
+## 🌐 Live Demo
+
+### Frontend
+🔗 https://ticket-booking-system-movies-and-concerts.onrender.com
+
+### Backend API
+🔗 https://marqueee.onrender.com
+
+### API Test
+🔗 https://marqueee.onrender.com/api/shows
 
 ## Deployment
 
-- Backend → Render / Railway (Node service, set env vars, `npm start`)
+| Service | Platform | URL |
+|---------|----------|-----|
+| Frontend | Render Static Site | https://ticket-booking-system-movies-and-concerts.onrender.com |
+| Backend API | Render Web Service | https://marqueee.onrender.com |
+| Database | MongoDB Atlas | Cloud Hosted |
+
+### Environment Variables
+
+#### Backend
+
+```env
+CLIENT_URL=https://ticket-booking-system-movies-and-concerts.onrender.com
+```
+
+#### Frontend
+
+```env
+VITE_API_URL=https://marqueee.onrender.com/api
+VITE_SOCKET_URL=https://marqueee.onrender.com
+```
 - Frontend → Vercel (set `VITE_API_URL`/`VITE_SOCKET_URL` to the deployed backend)
 - Database → MongoDB Atlas
