@@ -13,6 +13,7 @@ const holdRoutes = require('./routes/holdRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const waitlistRoutes = require('./routes/waitlistRoutes');
 const organiserRoutes = require('./routes/organiserRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
 const startSeatHoldReleaseCron = require('./cron/releaseExpiredHolds');
 
 connectDB();
@@ -35,6 +36,7 @@ app.use('/api/shows', holdRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/organiser', organiserRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // 404 handler
 app.use((req, res) => {

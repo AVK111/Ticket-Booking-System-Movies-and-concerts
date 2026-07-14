@@ -9,7 +9,7 @@ import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import { notify } from '../lib/toast';
 
-const emptyForm = { title: '', type: 'movie', venueId: '', showDateTime: '', pricing: [] };
+const emptyForm = { title: '', type: 'movie', venueId: '', showDateTime: '', pricing: [], image: '' };
 
 const OrganiserDashboard = () => {
     const [shows, setShows] = useState([]);
@@ -18,6 +18,7 @@ const OrganiserDashboard = () => {
     const [form, setForm] = useState(emptyForm);
     const [showForm, setShowForm] = useState(false);
     const [error, setError] = useState('');
+    const [uploading, setUploading] = useState(false);
     const [busy, setBusy] = useState(false);
     const [loading, setLoading] = useState(true);
     const [deleteId, setDeleteId] = useState(null);
@@ -55,6 +56,30 @@ const OrganiserDashboard = () => {
             ...form,
             pricing: form.pricing.map((p) => (p.category === category ? { ...p, price: Number(price) } : p)),
         });
+    };
+
+    const handleImageUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        setUploading(true);
+        setError('');
+        try {
+            const { data } = await api.post('/upload/image', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            setForm((prev) => ({ ...prev, image: data.url }));
+            notify.success('Image uploaded successfully');
+        } catch (err) {
+            const msg = err.response?.data?.message || 'Failed to upload image';
+            setError(msg);
+            notify.error(msg);
+        } finally {
+            setUploading(false);
+        }
     };
 
     const handleCreate = async (e) => {
@@ -174,6 +199,31 @@ const OrganiserDashboard = () => {
                             onChange={(e) => setForm({ ...form, showDateTime: e.target.value })}
                         />
 
+                        {form.image ? (
+                            <div className="relative w-full h-32 rounded-xl overflow-hidden mb-4 border border-border bg-bg-secondary">
+                                <img src={form.image} alt="Show preview" className="w-full h-full object-cover" />
+                                <button
+                                    type="button"
+                                    onClick={() => setForm((prev) => ({ ...prev, image: '' }))}
+                                    className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full p-1.5 transition-colors"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="mb-4">
+                                <label className="block text-xs font-medium text-text-dim mb-1.5">Show Banner (Optional)</label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    disabled={uploading}
+                                    onChange={handleImageUpload}
+                                    className="w-full text-sm text-text-dim file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20 cursor-pointer file:cursor-pointer"
+                                />
+                                {uploading && <p className="text-xs text-accent mt-1.5 animate-pulse">Uploading image...</p>}
+                            </div>
+                        )}
+
                         {venueCategories.length > 0 && (
                             <div className="mb-4">
                                 <label className="block text-xs font-medium text-text-dim mb-2">Pricing per category</label>
@@ -218,15 +268,20 @@ const OrganiserDashboard = () => {
                         return (
                             <Card key={show._id} className="p-5">
                                 <div className="flex items-start justify-between mb-3">
-                                    <div>
-                                        <h3 className="font-display font-semibold text-text">{show.title}</h3>
-                                        <div className="flex items-center gap-3 text-xs text-text-faint mt-1">
-                                            <span className="flex items-center gap-1">
-                                                <MapPin size={11} /> {show.venue?.name}
-                                            </span>
-                                            <span className="flex items-center gap-1">
-                                                <Calendar size={11} /> {new Date(show.showDateTime).toLocaleDateString()}
-                                            </span>
+                                    <div className="flex gap-4 items-center">
+                                        {show.image && (
+                                            <img src={show.image} alt={show.title} className="w-12 h-12 rounded-xl object-cover border border-border shrink-0" />
+                                        )}
+                                        <div>
+                                            <h3 className="font-display font-semibold text-text">{show.title}</h3>
+                                            <div className="flex items-center gap-3 text-xs text-text-faint mt-1">
+                                                <span className="flex items-center gap-1">
+                                                    <MapPin size={11} /> {show.venue?.name}
+                                                </span>
+                                                <span className="flex items-center gap-1">
+                                                    <Calendar size={11} /> {new Date(show.showDateTime).toLocaleDateString()}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                     <button onClick={() => setDeleteId(show._id)} className="text-text-faint hover:text-error transition-colors p-1.5">

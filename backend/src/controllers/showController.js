@@ -7,7 +7,7 @@ const generateSeatMapForShow = require('../utils/generateSeatMapForShow');
 // @access Private (organiser)
 const createShow = async (req, res) => {
     try {
-        const { title, type, venue: venueId, showDateTime, pricing } = req.body;
+        const { title, type, venue: venueId, showDateTime, pricing, image } = req.body;
 
         if (!title || !type || !venueId || !showDateTime || !pricing) {
             return res
@@ -34,6 +34,7 @@ const createShow = async (req, res) => {
             venue: venueId,
             showDateTime,
             pricing,
+            image,
             organiser: req.user._id,
         });
 
@@ -98,10 +99,11 @@ const updateShow = async (req, res) => {
             return res.status(403).json({ message: 'You can only edit your own shows' });
         }
 
-        const { title, showDateTime, pricing, status } = req.body;
+        const { title, showDateTime, pricing, status, image } = req.body;
         if (title !== undefined) show.title = title;
         if (showDateTime !== undefined) show.showDateTime = showDateTime;
         if (status !== undefined) show.status = status;
+        if (image !== undefined) show.image = image;
 
         if (pricing !== undefined) {
             const venue = await Venue.findById(show.venue);

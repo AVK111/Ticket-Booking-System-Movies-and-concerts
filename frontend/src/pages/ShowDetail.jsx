@@ -293,10 +293,15 @@ const ShowDetail = () => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
-                className={`relative h-52 rounded-2xl overflow-hidden border border-border mb-8 flex items-end p-6 bg-gradient-to-br ${show.type === 'concert' ? 'from-accent-2/25' : 'from-accent/25'
-                    } via-bg-secondary to-bg-secondary`}
+                className={`relative h-52 rounded-2xl overflow-hidden border border-border mb-8 flex items-end p-6 ${show.image ? '' : `bg-gradient-to-br ${show.type === 'concert' ? 'from-accent-2/25' : 'from-accent/25'} via-bg-secondary to-bg-secondary`}`}
             >
-                <TypeIcon size={120} className="absolute right-6 top-1/2 -translate-y-1/2 text-white/[0.06]" />
+                {show.image && (
+                    <div className="absolute inset-0 z-0">
+                        <img src={show.image} alt={show.title} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-bg-secondary via-bg-secondary/40 to-transparent" />
+                    </div>
+                )}
+                {!show.image && <TypeIcon size={120} className="absolute right-6 top-1/2 -translate-y-1/2 text-white/[0.06]" />}
                 <div className="relative z-10">
                     <Badge variant={show.type === 'concert' ? 'accent2' : 'accent'} className="mb-3">
                         {show.type}

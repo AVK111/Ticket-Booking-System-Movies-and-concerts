@@ -29,7 +29,11 @@ const EventCard = ({ show, className = '' }) => {
                 className={`rounded-2xl border border-border bg-surface overflow-hidden transition-shadow duration-200 ${style.ring}`}
             >
                 <div className={`relative h-44 bg-gradient-to-br ${style.gradient} bg-bg-secondary flex items-center justify-center overflow-hidden`}>
-                    <Icon size={40} className="text-white/25 transition-transform duration-300 group-hover:scale-110" />
+                    {show.image ? (
+                        <img src={show.image} alt={show.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                    ) : (
+                        <Icon size={40} className="text-white/25 transition-transform duration-300 group-hover:scale-110" />
+                    )}
                     <span className="absolute top-3 left-3 text-[10px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full bg-black/40 backdrop-blur-sm text-white/80">
                         {show.type}
                     </span>

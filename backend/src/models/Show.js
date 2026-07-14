@@ -12,6 +12,7 @@ const showSchema = new mongoose.Schema(
     {
         title: { type: String, required: true, trim: true },
         type: { type: String, enum: ['movie', 'concert'], required: true },
+        image: { type: String },
         organiser: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
         venue: { type: mongoose.Schema.Types.ObjectId, ref: 'Venue', required: true },
         showDateTime: { type: Date, required: true },
