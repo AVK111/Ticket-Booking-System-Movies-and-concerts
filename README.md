@@ -10,38 +10,97 @@
 
 A full-stack ticket booking platform for movies and concerts. Customers browse events, book seats from a live visual seat map, get auto-released holds on checkout abandonment, join waitlists on sold-out shows, and receive QR-coded email tickets on confirmation.
 
-**Stack:** MongoDB · Express.js · React (Vite) · Node.js · Socket.io
+**Stack:** MongoDB · Express.js · React (Vite) · Node.js · Socket.io · Cloudinary · Multer
 
 ---
+
 
 ## Features
 
 - Role-based auth (customer / organiser / admin) via JWT
 - Admin: venue + seat layout management
-- Organiser: event/show creation with per-category pricing, revenue dashboard
+- Organiser: event/show creation with Cloudinary poster upload, category pricing and revenue dashboard
 - Customer: browse/filter events, live seat map, seat hold with TTL, booking, cancellation, waitlist
 - **Concurrency-safe seat holds** — atomic per-seat claims, no two customers can hold/book the same seat
 - **TTL auto-release** — abandoned holds free up automatically via a scheduled job
 - **Real-time seat map** — Socket.io broadcasts hold/release/booking events to everyone viewing a show
 - **Waitlist with auto-assignment** — cancelled seats are offered to the next waitlisted customer with a time-limited offer, cascading to the next person if unclaimed
 - QR-coded email tickets on booking confirmation (Nodemailer + `qrcode`)
+- Cloudinary-powered poster uploads for movies and concerts
+- Secure image upload pipeline using Multer + Cloudinary Storage
 
 ---
+## System Architecture
+
+ ```text
+                                                              ┌─────────────────────────────┐
+                                                              │        End Users            │
+                                                              │ (Customer / Admin /         │
+                                                              │  Organiser)                 │
+                                                              └─────────────┬───────────────┘
+                                                                            │
+                                                                            ▼
+                                                      ┌─────────────────────────────────────┐
+                                                      │        React + Vite Frontend        │
+                                                      │      (Render Static Site)           │
+                                                      └─────────────┬───────────────────────┘
+                                                                    │
+                                                     REST API       │       Socket.IO
+                                                                    │
+                                                                    ▼
+                                                      ┌─────────────────────────────────────┐
+                                                      │      Express.js + Node.js API       │
+                                                      │      (Render Web Service)           │
+                                                      └──────┬──────────────┬───────────────┘
+                                                             │              │
+                                                             │              │
+                                              ┌──────────────┘              └───────────────┐
+                                              ▼                                             ▼
+                                    ┌─────────────────────┐                     ┌─────────────────────┐
+                                    │    MongoDB Atlas    │                     │     Cloudinary      │
+                                    │                     │                     │                     │
+                                    │ Users               │                     │ Movie Posters       │
+                                    │ Venues              │                     │ Concert Posters     │
+                                    │ Shows               │                     │ Image CDN           │
+                                    │ Bookings            │                     └─────────────────────┘
+                                    │ Seat Status         │
+                                    │ Waitlists           │
+                                    └──────────┬──────────┘
+                                               │
+                                               │
+                                               ▼
+                                    ┌─────────────────────────────┐
+                                    │  Scheduled Cron Jobs        │
+                                    │                             │
+                                    │ • Auto-release seat holds   │
+                                    │ • Waitlist processing        │
+                                    └─────────────────────────────┘
+                                    
+                                               │
+                                               ▼
+                                    ┌─────────────────────────────┐
+                                    │ Gmail SMTP (Nodemailer)     │
+                                    │                             │
+                                    │ • Booking confirmation      │
+                                    │ • QR Ticket delivery        │
+                                    └─────────────────────────────┘
+```
 
 ## Project Structure
 
 ```
 Ticket-Booking-System/
-├── backend/
-│   └── src/
-│       ├── config/       # DB connection
-│       ├── models/       # Mongoose schemas
-│       ├── controllers/  # Route handlers
-│       ├── routes/       # Express routers
-│       ├── middleware/   # Auth (JWT + role guards)
-│       ├── cron/         # TTL auto-release job
-│       ├── utils/        # Seat map generation, QR/email helpers, waitlist logic
-│       └── scripts/      # DB seed script
+└── backend/
+    └── src/
+        ├── config/       # MongoDB & Cloudinary configuration
+        ├── middleware/   # Auth (JWT + role guards)
+        ├── controllers/  # Route handlers
+        ├── models/       # Mongoose schemas
+        ├── routes/       # Express routers
+        ├── cron/         # TTL auto-release job
+        ├── utils/        # Seat map generation, QR/email helpers, waitlist logic
+        ├── uploads/      # Multer configuration
+        └── scripts/      # Database seed script
 └── frontend/
     └── src/
         ├── api/          # Axios client, socket.io client
@@ -51,6 +110,7 @@ Ticket-Booking-System/
 ```
 
 ---
+
 
 ## Setup
 
@@ -76,15 +136,18 @@ npm run dev
 ### Environment Variables
 
 **backend/.env**
-| Variable | Description |
-|---|---|
-| `MONGO_URI` | MongoDB Atlas (or local) connection string |
-| `JWT_SECRET` | Random secret for signing auth tokens |
-| `JWT_EXPIRES_IN` | Token lifetime (default `7d`) |
-| `CLIENT_URL` | Frontend origin, for CORS + email links |
-| `SEAT_HOLD_TTL_MINUTES` | How long a seat hold lasts before auto-release (default `10`) |
-| `WAITLIST_OFFER_TTL_MINUTES` | How long a waitlist offer lasts (default `15`) |
-| `EMAIL_HOST` / `EMAIL_PORT` / `EMAIL_USER` / `EMAIL_PASS` / `EMAIL_FROM` | SMTP credentials (Mailtrap for testing, or Gmail app password) |
+| `MONGO_URI` | MongoDB Atlas connection string |
+| `JWT_SECRET` | JWT signing secret |
+| `JWT_EXPIRES_IN` | Token lifetime |
+| `CLIENT_URL` | Frontend URL |
+| `EMAIL_HOST` | SMTP host |
+| `EMAIL_PORT` | SMTP port |
+| `EMAIL_USER` | SMTP username |
+| `EMAIL_PASS` | SMTP password |
+| `EMAIL_FROM` | Sender email |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name |
+| `CLOUDINARY_API_KEY` | Cloudinary API key |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret |
 
 **frontend/.env**
 | Variable | Description |
@@ -107,7 +170,7 @@ npm run dev
 |---|---|
 | **User** | name, email, password (hashed), role |
 | **Venue** | name, address, createdBy, seatMap: `[{ row, category, seatCount }]` |
-| **Show** | title, type, organiser, venue, showDateTime, pricing: `[{ category, price }]`, status |
+| **Show** | title, type, organiser, venue, image, showDateTime, pricing, status |
 | **SeatStatus** | show, row, seatNumber, category, status (`available`/`held`/`booked`), heldBy, holdExpiresAt, waitlistOfferId |
 | **Booking** | bookingRef, customer, show, seats: `[{ row, seatNumber, category, price }]`, totalAmount, status |
 | **Waitlist** | show, category, customer, status (`waiting`/`offered`/`converted`/`expired`/`cancelled`), offeredSeat, offerExpiresAt |
@@ -115,6 +178,32 @@ npm run dev
 One `SeatStatus` document exists per seat per show — this is the single source of truth the hold/booking/TTL/waitlist logic all operate on.
 
 ---
+## Image Storage
+
+Movie and concert posters are stored using **Cloudinary**.
+
+### Upload Flow
+
+Organizer/Admin uploads poster
+        ↓
+Multer processes multipart form data
+        ↓
+Cloudinary uploads image
+        ↓
+Cloudinary returns a secure URL
+        ↓
+URL is stored in MongoDB
+        ↓
+Frontend renders poster directly from Cloudinary CDN
+
+### Benefits
+
+- Images are not stored inside MongoDB.
+- Smaller database size.
+- Faster API responses.
+- Global CDN delivery.
+- Optimized image loading.
+- Production-ready architecture.
 
 ## API Reference
 
@@ -207,7 +296,8 @@ One should return `200` with the seat held; the other should return `409 Some se
 |---------|----------|-----|
 | Frontend | Render Static Site | https://ticket-booking-system-movies-and-concerts.onrender.com |
 | Backend API | Render Web Service | https://marqueee.onrender.com |
-| Database | MongoDB Atlas | Cloud Hosted |
+| Database | MongoDB Atlas | Cloud Hosted | 
+| Media Storage | Cloudinary | Cloud Hosted |
 
 ### Environment Variables
 
