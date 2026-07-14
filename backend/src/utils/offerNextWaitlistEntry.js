@@ -2,6 +2,7 @@ const SeatStatus = require('../models/SeatStatus');
 const Waitlist = require('../models/Waitlist');
 const Show = require('../models/Show');
 const sendEmail = require('./sendEmail');
+const { waitlistOfferEmail } = require('./emailTemplates');
 const { emitSeatUpdate } = require('../socket');
 
 const OFFER_TTL_MS = (parseInt(process.env.WAITLIST_OFFER_TTL_MINUTES, 10) || 15) * 60 * 1000;
@@ -66,13 +67,7 @@ const offerNextWaitlistEntry = async (showId, category, seat) => {
         await sendEmail({
             to: customer.email,
             subject: `A seat is available — ${show?.title || 'your event'} (act fast!)`,
-            html: `
-        <h2>A seat opened up!</h2>
-        <p>Seat <strong>${seat.row}${seat.seatNumber}</strong> (${category}) is being held for you.</p>
-        <p>You have until <strong>${offerExpiresAt.toLocaleString()}</strong> to complete your booking,
-        or it will be offered to the next person in line.</p>
-        <p>Log in and go to "Complete Booking" for this show to confirm your seat.</p>
-      `,
+            html: waitlistOfferEmail({ show, seat, category, offerExpiresAt, showId }),
         });
     }
 

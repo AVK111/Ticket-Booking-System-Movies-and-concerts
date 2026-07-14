@@ -1,26 +1,43 @@
 import React from 'react'
 import { useEffect, useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { Plus, Trash2, Calendar, MapPin, IndianRupee, Ticket, TrendingUp } from 'lucide-react';
 import api from '../api/axios';
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import Modal from '../components/ui/Modal';
+import { notify } from '../lib/toast';
 
 const emptyForm = { title: '', type: 'movie', venueId: '', showDateTime: '', pricing: [] };
 
 const OrganiserDashboard = () => {
     const [shows, setShows] = useState([]);
     const [venues, setVenues] = useState([]);
+    const [summaries, setSummaries] = useState({});
     const [form, setForm] = useState(emptyForm);
     const [showForm, setShowForm] = useState(false);
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
-    const [summaries, setSummaries] = useState({}); // showId -> summary data
-    const [loadingSummary, setLoadingSummary] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [deleteId, setDeleteId] = useState(null);
 
-    const loadShows = async () => {
-        const { data } = await api.get('/organiser/shows');
-        setShows(data);
+    const loadAll = async () => {
+        setLoading(true);
+        const { data: showList } = await api.get('/organiser/shows');
+        setShows(showList);
+
+        // Pull the revenue/occupancy summary for every show up front so the
+        // dashboard can show real aggregate stats + a chart, not just a list.
+        const entries = await Promise.all(
+            showList.map((s) => api.get(`/organiser/shows/${s._id}/summary`).then((r) => [s._id, r.data]))
+        );
+        setSummaries(Object.fromEntries(entries));
+        setLoading(false);
     };
 
     useEffect(() => {
-        loadShows();
+        loadAll();
         api.get('/venues').then((res) => setVenues(res.data));
     }, []);
 
@@ -47,177 +64,216 @@ const OrganiserDashboard = () => {
         try {
             const { venueId, ...rest } = form;
             await api.post('/shows', { ...rest, venue: venueId });
+            notify.success('Show created');
             setForm(emptyForm);
             setShowForm(false);
-            await loadShows();
+            await loadAll();
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to create show');
+            const msg = err.response?.data?.message || 'Failed to create show';
+            setError(msg);
+            notify.error(msg);
         } finally {
             setBusy(false);
         }
     };
 
-    const handleDelete = async (id) => {
-        if (!confirm('Delete this show? This cannot be undone.')) return;
+    const handleDelete = async () => {
+        const id = deleteId;
+        setDeleteId(null);
         await api.delete(`/shows/${id}`);
-        await loadShows();
+        notify.success('Show deleted');
+        await loadAll();
     };
 
-    const toggleSummary = async (id) => {
-        if (summaries[id]) {
-            setSummaries((prev) => ({ ...prev, [id]: undefined }));
-            return;
-        }
-        setLoadingSummary(id);
-        const { data } = await api.get(`/organiser/shows/${id}/summary`);
-        setSummaries((prev) => ({ ...prev, [id]: data }));
-        setLoadingSummary(null);
-    };
+    const totalRevenue = Object.values(summaries).reduce((sum, s) => sum + s.totalRevenue, 0);
+    const totalTicketsSold = Object.values(summaries).reduce((sum, s) => sum + s.totalSeatsSold, 0);
+    const totalBookings = Object.values(summaries).reduce((sum, s) => sum + s.totalBookings, 0);
+
+    const chartData = shows.map((s) => ({
+        name: s.title.length > 12 ? s.title.slice(0, 12) + '…' : s.title,
+        revenue: summaries[s._id]?.totalRevenue || 0,
+    }));
 
     return (
-        <div className="container" style={{ paddingTop: 40, paddingBottom: 60, maxWidth: 800 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <h1 style={{ fontSize: '1.8rem', margin: 0 }}>Your shows</h1>
-                <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-                    {showForm ? 'Cancel' : '+ New show'}
-                </button>
+        <div className="max-w-5xl mx-auto px-6 pt-12 pb-20">
+            <div className="flex items-center justify-between mb-8">
+                <h1 className="font-display text-2xl font-bold text-text">Your shows</h1>
+                <Button icon={Plus} onClick={() => setShowForm(!showForm)}>
+                    {showForm ? 'Cancel' : 'New show'}
+                </Button>
             </div>
 
+            {!loading && shows.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <Stat icon={Ticket} label="Shows" value={shows.length} />
+                    <Stat icon={TrendingUp} label="Bookings" value={totalBookings} />
+                    <Stat icon={Ticket} label="Tickets sold" value={totalTicketsSold} />
+                    <Stat icon={IndianRupee} label="Revenue" value={`₹${totalRevenue}`} accent />
+                </div>
+            )}
+
+            {!loading && chartData.length > 0 && (
+                <Card className="p-5 mb-8">
+                    <h3 className="text-sm font-semibold text-text mb-4">Revenue by show</h3>
+                    <ResponsiveContainer width="100%" height={220}>
+                        <BarChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                            <XAxis dataKey="name" tick={{ fill: '#a1a1aa', fontSize: 11 }} axisLine={{ stroke: 'rgba(255,255,255,0.08)' }} tickLine={false} />
+                            <YAxis tick={{ fill: '#a1a1aa', fontSize: 11 }} axisLine={false} tickLine={false} />
+                            <Tooltip
+                                contentStyle={{ background: '#18181b', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, fontSize: 12 }}
+                                labelStyle={{ color: '#f4f4f5' }}
+                                cursor={{ fill: 'rgba(255,255,255,0.03)' }}
+                            />
+                            <Bar dataKey="revenue" fill="#E50914" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </Card>
+            )}
+
             {showForm && (
-                <form onSubmit={handleCreate} className="card" style={{ marginBottom: 24 }}>
-                    <div className="field">
-                        <label className="label">Title</label>
-                        <input className="input" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-                    </div>
+                <Card className="p-6 mb-8">
+                    <form onSubmit={handleCreate}>
+                        <Input label="Title" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
 
-                    <div className="field">
-                        <label className="label">Type</label>
-                        <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                            <option value="movie">Movie</option>
-                            <option value="concert">Concert</option>
-                        </select>
-                    </div>
+                        <div className="grid grid-cols-2 gap-3 mb-4">
+                            <div>
+                                <label className="block text-xs font-medium text-text-dim mb-1.5">Type</label>
+                                <select
+                                    className="w-full bg-bg-secondary border border-border rounded-xl px-3.5 py-2.5 text-sm text-text outline-none focus:border-accent/60"
+                                    value={form.type}
+                                    onChange={(e) => setForm({ ...form, type: e.target.value })}
+                                >
+                                    <option value="movie">Movie</option>
+                                    <option value="concert">Concert</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-text-dim mb-1.5">Venue</label>
+                                <select
+                                    className="w-full bg-bg-secondary border border-border rounded-xl px-3.5 py-2.5 text-sm text-text outline-none focus:border-accent/60"
+                                    required
+                                    value={form.venueId}
+                                    onChange={(e) => handleVenueChange(e.target.value)}
+                                >
+                                    <option value="">Select…</option>
+                                    {venues.map((v) => (
+                                        <option key={v._id} value={v._id}>
+                                            {v.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
 
-                    <div className="field">
-                        <label className="label">Venue</label>
-                        <select className="input" required value={form.venueId} onChange={(e) => handleVenueChange(e.target.value)}>
-                            <option value="">Select a venue…</option>
-                            {venues.map((v) => (
-                                <option key={v._id} value={v._id}>
-                                    {v.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="field">
-                        <label className="label">Date & time</label>
-                        <input
-                            className="input"
+                        <Input
+                            label="Date & time"
                             type="datetime-local"
                             required
                             value={form.showDateTime}
                             onChange={(e) => setForm({ ...form, showDateTime: e.target.value })}
                         />
-                    </div>
 
-                    {venueCategories.length > 0 && (
-                        <div className="field">
-                            <label className="label">Pricing per category</label>
-                            {venueCategories.map((category) => (
-                                <div key={category} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                                    <span style={{ width: 100, fontSize: '0.9rem', color: 'var(--text-dim)' }}>{category}</span>
-                                    <input
-                                        className="input"
-                                        type="number"
-                                        min="0"
-                                        placeholder="Price"
-                                        value={form.pricing.find((p) => p.category === category)?.price || ''}
-                                        onChange={(e) => updatePrice(category, e.target.value)}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {error && <p className="error-text">{error}</p>}
-
-                    <button className="btn btn-primary" disabled={busy}>
-                        {busy ? 'Creating…' : 'Create show'}
-                    </button>
-                </form>
-            )}
-
-            {shows.length === 0 ? (
-                <p style={{ color: 'var(--text-dim)' }}>You haven't created any shows yet.</p>
-            ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {shows.map((show) => (
-                        <div key={show._id} className="card">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <div>
-                                    <h3 style={{ margin: '0 0 4px' }}>{show.title}</h3>
-                                    <p style={{ margin: 0, color: 'var(--text-dim)', fontSize: '0.85rem' }}>
-                                        {show.venue?.name} · {new Date(show.showDateTime).toLocaleString()}
-                                    </p>
-                                </div>
-                                <div style={{ display: 'flex', gap: 8 }}>
-                                    <button className="btn btn-outline" onClick={() => toggleSummary(show._id)}>
-                                        {loadingSummary === show._id ? 'Loading…' : summaries[show._id] ? 'Hide summary' : 'View summary'}
-                                    </button>
-                                    <button className="btn btn-danger" onClick={() => handleDelete(show._id)}>
-                                        Delete
-                                    </button>
+                        {venueCategories.length > 0 && (
+                            <div className="mb-4">
+                                <label className="block text-xs font-medium text-text-dim mb-2">Pricing per category</label>
+                                <div className="space-y-2">
+                                    {venueCategories.map((category) => (
+                                        <div key={category} className="flex items-center gap-3">
+                                            <span className="w-24 text-sm text-text-dim">{category}</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                placeholder="Price"
+                                                className="flex-1 bg-bg-secondary border border-border rounded-xl px-3.5 py-2 text-sm text-text outline-none focus:border-accent/60"
+                                                value={form.pricing.find((p) => p.category === category)?.price || ''}
+                                                onChange={(e) => updatePrice(category, e.target.value)}
+                                            />
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
+                        )}
 
-                            {summaries[show._id] && (
-                                <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-                                    <div style={{ display: 'flex', gap: 24, marginBottom: 12 }}>
-                                        <Stat label="Bookings" value={summaries[show._id].totalBookings} />
-                                        <Stat label="Seats sold" value={summaries[show._id].totalSeatsSold} />
-                                        <Stat label="Revenue" value={`₹${summaries[show._id].totalRevenue}`} />
-                                    </div>
+                        {error && <p className="text-xs text-error mb-3">{error}</p>}
+                        <Button type="submit" loading={busy} className="w-full">
+                            Create show
+                        </Button>
+                    </form>
+                </Card>
+            )}
 
-                                    <table style={{ width: '100%', fontSize: '0.85rem', color: 'var(--text-dim)', borderCollapse: 'collapse' }}>
-                                        <thead>
-                                            <tr style={{ textAlign: 'left' }}>
-                                                <th>Category</th>
-                                                <th>Available</th>
-                                                <th>Held</th>
-                                                <th>Booked</th>
-                                                <th>Revenue</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {summaries[show._id].occupancy.map((o) => {
-                                                const cat = summaries[show._id].byCategory.find((c) => c.category === o.category);
-                                                return (
-                                                    <tr key={o.category}>
-                                                        <td>{o.category}</td>
-                                                        <td>{o.available}</td>
-                                                        <td>{o.held}</td>
-                                                        <td>{o.booked}</td>
-                                                        <td>₹{cat?.revenue || 0}</td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
+            {loading ? (
+                <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="h-20 rounded-2xl bg-surface border border-border animate-pulse" />
                     ))}
                 </div>
+            ) : shows.length === 0 ? (
+                <p className="text-text-dim text-sm">You haven't created any shows yet.</p>
+            ) : (
+                <div className="space-y-3">
+                    {shows.map((show) => {
+                        const s = summaries[show._id];
+                        return (
+                            <Card key={show._id} className="p-5">
+                                <div className="flex items-start justify-between mb-3">
+                                    <div>
+                                        <h3 className="font-display font-semibold text-text">{show.title}</h3>
+                                        <div className="flex items-center gap-3 text-xs text-text-faint mt-1">
+                                            <span className="flex items-center gap-1">
+                                                <MapPin size={11} /> {show.venue?.name}
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <Calendar size={11} /> {new Date(show.showDateTime).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setDeleteId(show._id)} className="text-text-faint hover:text-error transition-colors p-1.5">
+                                        <Trash2 size={15} />
+                                    </button>
+                                </div>
+
+                                {s && (
+                                    <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border">
+                                        <MiniStat label="Bookings" value={s.totalBookings} />
+                                        <MiniStat label="Seats sold" value={s.totalSeatsSold} />
+                                        <MiniStat label="Revenue" value={`₹${s.totalRevenue}`} />
+                                    </div>
+                                )}
+                            </Card>
+                        );
+                    })}
+                </div>
             )}
+
+            <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Delete show?">
+                <p className="text-sm text-text-dim mb-5">This cannot be undone.</p>
+                <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1" onClick={() => setDeleteId(null)}>
+                        Cancel
+                    </Button>
+                    <Button variant="danger" className="flex-1" onClick={handleDelete}>
+                        Delete
+                    </Button>
+                </div>
+            </Modal>
         </div>
     );
 };
 
-const Stat = ({ label, value }) => (
+const Stat = ({ icon: Icon, label, value, accent }) => (
+    <Card className="p-4">
+        <Icon size={16} className={accent ? 'text-accent' : 'text-text-faint'} />
+        <p className="text-xl font-display font-bold text-text mt-2">{value}</p>
+        <p className="text-xs text-text-faint">{label}</p>
+    </Card>
+);
+
+const MiniStat = ({ label, value }) => (
     <div>
-        <div style={{ fontSize: '1.3rem', fontWeight: 700 }}>{value}</div>
-        <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>{label}</div>
+        <p className="text-sm font-semibold text-text">{value}</p>
+        <p className="text-[11px] text-text-faint">{label}</p>
     </div>
 );
 

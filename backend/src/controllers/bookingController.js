@@ -5,6 +5,7 @@ const Booking = require('../models/Booking');
 const Waitlist = require('../models/Waitlist');
 const generateBookingRef = require('../utils/generateBookingRef');
 const sendEmail = require('../utils/sendEmail');
+const { bookingConfirmationEmail } = require('../utils/emailTemplates');
 const offerNextWaitlistEntry = require('../utils/offerNextWaitlistEntry');
 const { emitSeatUpdate } = require('../socket');
 
@@ -112,16 +113,7 @@ const createBooking = async (req, res) => {
         await sendEmail({
             to: req.user.email,
             subject: `Booking Confirmed — ${show.title} (${booking.bookingRef})`,
-            html: `
-        <h2>Booking Confirmed</h2>
-        <p><strong>${show.title}</strong></p>
-        <p>Show time: ${new Date(show.showDateTime).toLocaleString()}</p>
-        <p>Seats: ${seatList}</p>
-        <p>Total: ₹${totalAmount}</p>
-        <p>Booking reference: <strong>${booking.bookingRef}</strong></p>
-        <p>Show this QR code at entry:</p>
-        <img src="cid:qrcode" alt="Booking QR Code" />
-      `,
+            html: bookingConfirmationEmail({ show, booking, seatList, totalAmount }),
             attachments: [{ filename: 'ticket-qr.png', content: qrBuffer, cid: 'qrcode' }],
         });
 
